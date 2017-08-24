@@ -5,6 +5,11 @@
 import time
 import hmac
 import hashlib
+import getpass
+import ast
+import json
+from Crypto.Cipher import AES
+
 try:
     from urllib import urlencode
     from urlparse import urljoin
@@ -12,13 +17,6 @@ except ImportError:
     from urllib.parse import urlencode
     from urllib.parse import urljoin
 import requests
-
-try:
-    from Crypto.Cipher import AES
-    import getpass, ast, json
-    encrypted = True
-except ImportError:
-    encrypted = False
 
 BUY_ORDERBOOK = 'buy'
 SELL_ORDERBOOK = 'sell'
@@ -48,7 +46,8 @@ ACCOUNT_SET = {
 
 
 def encrypt(api_key, api_secret, export=True, export_fn='secrets.json'):
-    cipher = AES.new(getpass.getpass('Input encryption password (string will not show)'))
+    cipher = AES.new(getpass.getpass('Input encryption password '
+                                     '(string will not show)'))
     api_key_n = cipher.encrypt(api_key)
     api_secret_n = cipher.encrypt(api_secret)
     api = {'key': str(api_key_n), 'secret': str(api_secret_n)}
@@ -57,11 +56,13 @@ def encrypt(api_key, api_secret, export=True, export_fn='secrets.json'):
             json.dump(api, outfile)
     return api
 
+
 def using_requests(request_url, apisign):
     return requests.get(
                 request_url,
                 headers={"apisign": apisign}
             ).json()
+
 
 class Bittrex(object):
     """
@@ -73,8 +74,9 @@ class Bittrex(object):
         self.dispatch = dispatch
 
     def decrypt(self):
-        if encrypted:
-            cipher = AES.new(getpass.getpass('Input decryption password (string will not show)'))
+        try:
+            cipher = AES.new(getpass.getpass('Input decryption password '
+                                             '(string will not show)'))
             try:
                 self.api_key = ast.literal_eval(self.api_key) if type(self.api_key) == str else self.api_key
                 self.api_secret = ast.literal_eval(self.api_secret) if type(self.api_secret) == str else self.api_secret
@@ -82,7 +84,7 @@ class Bittrex(object):
                 pass
             self.api_key = cipher.decrypt(self.api_key).decode()
             self.api_secret = cipher.decrypt(self.api_secret).decode()
-        else:
+        except ImportError:
             raise ImportError('"pycrypto" module has to be installed')
 
     def api_query(self, method, options=None):
